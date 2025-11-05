@@ -1,0 +1,110 @@
+name: Python CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ] # main 브랜치에 푸시될 때 실행
+  pull_request:
+    branches: [ "main" ] # main 브랜치로 PR이 올 때 실행
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      # 테스트를 위한 임시 DB와 Redis
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: 1. Checkout repository
+      uses: actions/checkout@v3
+
+    - name: 2. Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 3. Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # (테스트용 패키지가 있다면 추가, 예: pip install pytest)
+
+    - name: 4. Run tests (Linting)
+      # 실제로는 pytest 등을 실행해야 합니다. 여기서는 Linting(flake8)으로 대체합니다.
+      # (pip install flake8 필요)
+      run: |
+        pip install flake8
+        echo "Running linter (flake8)..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    # (여기에 실제 'pytest' 단계를 추가해야 합니다)
+    # - name: 5. Run Pytest
+    #   env:
+    #     DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
+    #     CELERY_BROKER_URL: redis://localhost:6379/0
+    #     CELERY_RESULT_BACKEND: redis://localhost:6379/0
+    #   run: |
+    #     pip install pytest
+    #     pytest
+
+  deploy-to-production:
+    # 'build-and-test' 잡이 성공하고, 'main' 브랜치에 'push'가 일어났을 때만 실행
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. Checkout repository
+      uses: actions/checkout@v3
+
+    # (예시: Docker Hub에 이미지 빌드 및 푸시)
+    - name: 2. Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: 3. Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-fastapi-app:latest # Docker Hub 사용자명으로 변경
+
+    # (예시: 프로덕션 서버에 SSH로 접속하여 배포)
+    - name: 4. Deploy to Production Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USERNAME }}
+        key: ${{ secrets.PROD_SERVER_SSH_KEY }}
+        script: |
+          cd /path/to/your/project
+          git pull origin main
+          docker-compose pull # Docker Hub에서 새 이미지 받아오기
+          docker-compose down
+          docker-compose up -d --build
+          echo "Deployment complete!"

@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 1. FastAPI 웹 서버
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./app:/app
+      - ./app/uploads:/app/uploads # 업로드 폴더 공유
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:password@db/appdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # 2. Celery 워커
+  worker:
+    build: .
+    command: celery -A app.celery_worker.celery_app worker --loglevel=info
+    volumes:
+      - ./app:/app
+      - ./app/uploads:/app/uploads # 업로드 폴더 공유
+    environment:
+      - DATABASE_URL=postgresql://user:password@db/appdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # 3. PostgreSQL 데이터베이스
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=appdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # 로컬에서 DB 접속 시 필요
+
+  # 4. Redis (Celery 메시지 브로커)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

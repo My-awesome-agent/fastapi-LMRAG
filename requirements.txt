@@ -1,0 +1,18 @@
+FastAPI
+
+fastapi
+uvicorn[standard]
+
+Celery (Redis 브로커 포함)
+
+celery[redis]
+
+PostgreSQL
+
+sqlalchemy
+psycopg2-binary # Postgres 드라이버
+
+기타
+
+python-dotenv     # .env 파일 로드
+python-multipart  # FastAPI 파일 업로드용
