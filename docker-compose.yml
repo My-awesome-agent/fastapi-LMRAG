@@ -4,13 +4,15 @@ services:
   # 1. FastAPI 웹 서버
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # [수정] sh -c를 사용해 CWD와 PYTHONPATH를 강제로 설정한 후 uvicorn을 실행합니다.
+    command: sh -c "export PYTHONPATH=/app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
-      - ./app:/app
-      - ./app/uploads:/app/uploads # 업로드 폴더 공유
+      - .:/app # 프로젝트 전체를 마운트합니다.
+      - /Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads
     ports:
       - "8000:8000"
     environment:
+      - PYTHONPATH=/app # [수정] 이중으로 설정하여 확실하게 합니다.
       - DATABASE_URL=postgresql://user:password@db/appdb
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -21,11 +23,13 @@ services:
   # 2. Celery 워커
   worker:
     build: .
-    command: celery -A app.celery_worker.celery_app worker --loglevel=info
+    # [수정] sh -c를 사용해 CWD와 PYTHONPATH를 강제로 설정한 후 celery를 실행합니다.
+    command: sh -c "export PYTHONPATH=/app && celery -A app.celery_worker.celery_app worker --loglevel=info"
     volumes:
-      - ./app:/app
-      - ./app/uploads:/app/uploads # 업로드 폴더 공유
+      - .:/app # 프로젝트 전체를 마운트합니다.
+      - /Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads
     environment:
+      - PYTHONPATH=/app # [수정] 이중으로 설정하여 확실하게 합니다.
       - DATABASE_URL=postgresql://user:password@db/appdb
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -41,9 +45,9 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=appdb
     volumes:
-      - /Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads
+      - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432" # 로컬에서 DB 접속 시 필요
+      - "5432:5432"
 
   # 4. Redis (Celery 메시지 브로커)
   redis:

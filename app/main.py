@@ -138,6 +138,3 @@ async def get_processing_status(task_id: str, db: Session = Depends(get_db)):
         )
 
     return db_task  # Pydantic이 자동으로 schemas.TaskStatus로 변환 (orm_mode=True)
-
-
-```
