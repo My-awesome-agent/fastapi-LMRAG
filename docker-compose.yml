@@ -4,15 +4,15 @@ services:
   # 1. FastAPI 웹 서버
   api:
     build: .
-    # [수정] sh -c를 사용해 CWD와 PYTHONPATH를 강제로 설정한 후 uvicorn을 실행합니다.
-    command: sh -c "export PYTHONPATH=/app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # [수정] --reload 옵션 제거 (DB 테이블 생성 충돌 방지)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     volumes:
-      - .:/app # 프로젝트 전체를 마운트합니다.
-      - /Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads
+      - .:/app # 코드 변경 실시간 반영 (루트 마운트)
+      - "/Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads" # 업로드 폴더
     ports:
       - "8000:8000"
     environment:
-      - PYTHONPATH=/app # [수정] 이중으로 설정하여 확실하게 합니다.
+      - PYTHONPATH=/app # Dockerfile의 ENV와 함께 이중 보장
       - DATABASE_URL=postgresql://user:password@db/appdb
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -23,13 +23,12 @@ services:
   # 2. Celery 워커
   worker:
     build: .
-    # [수정] sh -c를 사용해 CWD와 PYTHONPATH를 강제로 설정한 후 celery를 실행합니다.
-    command: sh -c "export PYTHONPATH=/app && celery -A app.celery_worker.celery_app worker --loglevel=info"
+    command: celery -A app.celery_worker.celery_app worker --loglevel=info
     volumes:
-      - .:/app # 프로젝트 전체를 마운트합니다.
-      - /Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads
+      - .:/app # 코드 변경 실시간 반영 (루트 마운트)
+      - "/Users/stephano/Desktop/한양대학교/4-인공지능프로젝트1, 2/Resume 저장용 테스트 폴더:/app/uploads"
     environment:
-      - PYTHONPATH=/app # [수정] 이중으로 설정하여 확실하게 합니다.
+      - PYTHONPATH=/app # ModuleNotFoundError 해결
       - DATABASE_URL=postgresql://user:password@db/appdb
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -45,15 +44,15 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=appdb
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data # DB 데이터 영구 보존
     ports:
-      - "5432:5432"
+      - "5432:5432" # 로컬에서 DB 툴로 접속 시 필요
 
   # 4. Redis (Celery 메시지 브로커)
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6379:6379" # 로컬에서 Redis 툴로 접속 시 필요
 
 volumes:
-  postgres_data:
+  postgres_data: # DB 데이터를 저장하기 위한 명명된 볼륨
